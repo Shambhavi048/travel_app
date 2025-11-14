@@ -11,6 +11,13 @@ users_col = db["users"]
 catalogue_col = db["catalogue"]
 bookings_col = db["bookings"]
 
+# --------------------- INIT SESSION STATE ---------------------
+if "admin_logged_in" not in st.session_state:
+    st.session_state["admin_logged_in"] = False
+
+if "user" not in st.session_state:
+    st.session_state["user"] = None
+
 # --------------------- AUTH HELPERS ---------------------
 def admin_login(username, password):
     return username == "shambhavi" and password == "shambhavi01"
@@ -34,6 +41,10 @@ def register_user(fullname, username, password):
 def admin_dashboard():
     st.title("Admin Dashboard")
 
+    if st.button("Logout"):
+        st.session_state["admin_logged_in"] = False
+        st.rerun()
+
     menu = ["Create Travel Catalogue", "View Catalogue", "User Management", "Travel Bookings"]
     choice = st.sidebar.selectbox("Admin Menu", menu)
 
@@ -41,13 +52,15 @@ def admin_dashboard():
     if choice == "Create Travel Catalogue":
         st.subheader("Add New Travel Catalogue Item")
 
-        location = st.text_input("Location Name")
-        hotel_name = st.text_input("Hotel Name")
-        hotel_cost = st.number_input("Hotel Cost Per Night", min_value=0)
-        activity_name = st.text_input("Activity Name")
-        activity_cost = st.number_input("Activity Cost", min_value=0)
+        with st.form("catalogue_form"):
+            location = st.text_input("Location Name")
+            hotel_name = st.text_input("Hotel Name")
+            hotel_cost = st.number_input("Hotel Cost Per Night", min_value=0)
+            activity_name = st.text_input("Activity Name")
+            activity_cost = st.number_input("Activity Cost", min_value=0)
+            submit = st.form_submit_button("Submit")
 
-        if st.button("Submit"):
+        if submit:
             catalogue_col.insert_one({
                 "location": location.lower(),
                 "hotel": hotel_name,
@@ -85,6 +98,10 @@ def admin_dashboard():
 def user_dashboard(user):
     st.title(f"Welcome, {user['fullname']} 👋")
 
+    if st.button("Logout"):
+        st.session_state["user"] = None
+        st.rerun()
+
     menu = ["Search & Book", "Manage Bookings"]
     choice = st.sidebar.selectbox("User Menu", menu)
 
@@ -100,7 +117,6 @@ def user_dashboard(user):
             if not results:
                 st.error("No results found for this location.")
             else:
-                st.success("Results found!")
                 for item in results:
                     st.write(f"### Hotel: {item['hotel']} — {item['hotel_cost']} per night")
                     st.write(f"Activity: {item['activity']} — {item['activity_cost']}")
@@ -135,6 +151,17 @@ def user_dashboard(user):
 def main():
     st.title("🌍 Travel Booking App")
 
+    # ------------------ ADMIN LOGGED-IN VIEW ------------------
+    if st.session_state["admin_logged_in"]:
+        admin_dashboard()
+        return
+
+    # ------------------ USER LOGGED-IN VIEW ------------------
+    if st.session_state["user"] is not None:
+        user_dashboard(st.session_state["user"])
+        return
+
+    # ------------------ LOGIN SELECTION ------------------
     page = st.sidebar.selectbox("Choose Login Type", ["Admin Login", "User Login"])
 
     # ------------------ ADMIN LOGIN ------------------
@@ -145,7 +172,8 @@ def main():
 
         if st.button("Login as Admin"):
             if admin_login(admin_user, admin_pass):
-                admin_dashboard()
+                st.session_state["admin_logged_in"] = True
+                st.rerun()
             else:
                 st.error("Invalid Admin Credentials")
 
@@ -175,7 +203,8 @@ def main():
             if st.button("Login"):
                 user = user_login(username, password)
                 if user:
-                    user_dashboard(user)
+                    st.session_state["user"] = user
+                    st.rerun()
                 else:
                     st.error("Invalid username or password")
 
